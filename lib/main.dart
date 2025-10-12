@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:senior_care/pages/auth/signin_page.dart';
 import 'package:senior_care/pages/welcome_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
@@ -30,7 +31,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      home: showHome ? HomePage() : WelcomeScreen(),
+      home: showHome ? WelcomeScreen() : SignInPage(),
     );
   }
 }

@@ -1,43 +1,15 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:senior_care/pages/auth/signin_page.dart';
 import 'package:senior_care/pages/welcome_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import 'package:firebase_core/firebase_core.dart';
 
 class WelcomeScreen extends StatefulWidget{
   const WelcomeScreen({Key? key}) : super(key: key);
 
   @override
   _WelcomeScreenState createState() => _WelcomeScreenState();
-}
-
-class HomePage extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Home Page'),
-        actions: [
-          IconButton(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              prefs.setBool('showHome', false);
-
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => WelcomeScreen()),
-              );
-            },
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
-      body: Center(
-        child: Text('Welcome to the Home Page!',
-        style: TextStyle(color: Colors.black),
-      ),
-    ));
-  }
 }
 
 
@@ -151,7 +123,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           final prefs = await SharedPreferences.getInstance();
           prefs.setBool('showHome', true);
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => HomePage())
+            MaterialPageRoute(builder: (context) => SignInPage())
           );
         },
          child:  const Text(
