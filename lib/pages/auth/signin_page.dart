@@ -99,10 +99,7 @@ class _SignInPageState extends State<SignInPage> {
       );
 
   _signup() async {
-    final user = await _auth.createUserWithEmailAndPassword(_email.text, _password.text);
-    if (user != null) {
-      print("Utworzono konto użytkownika");
-      goToHome(context);
-    }
+   await _auth.createUserWithEmailAndPassword(_email.text, _password.text);
+    Navigator.pop(context);
   }
 }

@@ -1,8 +1,7 @@
-import 'dart:developer';
 import 'package:senior_care/pages/auth/auth_service.dart';
 import 'package:flutter/material.dart';
+import 'package:senior_care/pages/auth/forgot_password.dart';
 import 'package:senior_care/pages/auth/signin_page.dart';
-import 'package:senior_care/pages/home_page.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -54,6 +53,28 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               controller: _password,
             ),
+            
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 25.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (context) {
+                        return ForgotPassword();
+                      }));
+                    },
+                    child: Text('Nie pamiętasz hasła?',
+                    style: TextStyle(
+                      color: Colors.blue,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              )],
+              ),
+            ),
+    
             const SizedBox(height: 30),
             TextButton(
               child: const Text("Zaloguj się"),
@@ -80,17 +101,8 @@ class _LoginScreenState extends State<LoginScreen> {
         MaterialPageRoute(builder: (context) => const SignInPage()),
       );
 
-  goToHome(BuildContext context) => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-
   _login() async {
-    final user = await _auth.loginUserWithEmailAndPassword(_email.text, _password.text);
+    await _auth.loginUserWithEmailAndPassword(_email.text, _password.text);
 
-    if (user != null) {
-      log("Zalogowano pomyślnie");
-      goToHome(context);
-    }
   }
 }
