@@ -1,7 +1,5 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:senior_care/pages/auth/auth_service.dart';
-import 'package:senior_care/pages/auth/login_page.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -24,7 +22,6 @@ class HomeScreen extends StatelessWidget {
               child: const Text("Wyloguj się"),
               onPressed: () async {
                 await _auth.signOut();
-                goToLogin(context);
               },
             )
           ],
@@ -32,9 +29,4 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
-
-  goToLogin(BuildContext context) => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
 }
