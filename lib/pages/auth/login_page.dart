@@ -1,3 +1,4 @@
+import 'package:senior_care/components/square_tiles.dart';
 import 'package:senior_care/pages/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:senior_care/pages/auth/forgot_password.dart';
@@ -79,6 +80,15 @@ class _LoginScreenState extends State<LoginScreen> {
             TextButton(
               child: const Text("Zaloguj się"),
               onPressed: _login,
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SquareTile(
+                  imagePath: 'assets/google.png',
+                  onTap: () => AuthService().signInWithGoogle(),
+                ),
+              ],
             ),
             const SizedBox(height: 5),
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
