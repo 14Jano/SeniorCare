@@ -1,7 +1,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   Future<UserCredential?> signInWithGoogle() async {
@@ -39,29 +42,31 @@ class AuthService {
     }
   }
 
-  Future<User?> createUserWithEmailAndPassword(String email, String password) async {
+  Future<String?> createUserWithEmailAndPassword({required String name, required String email, required String password, required String role}) async {
     try {
-      final cred = await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      return cred.user;
-    } on FirebaseAuthException catch (e) {
-      FlutterExceptionHandler(e.code);
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password.trim());
+      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+        'name': name.trim(),
+        'email': email.trim(),
+        'role': role,
+      });
+      return null;
+    } catch (e) {
+    return e.toString();
     }
-    catch (e) {
-      print('Coś poszło nie tak');
-    }
-    return null;
   }
 
-  Future<User?> loginUserWithEmailAndPassword(String email, String password) async {
+  Future<String?> loginUserWithEmailAndPassword({required String email, required String password}) async {
     try {
-      final cred = await _auth.signInWithEmailAndPassword(email: email, password: password);
-      return cred.user;
-    } on FirebaseAuthException catch (e) {
-      FlutterExceptionHandler(e.code);
+      UserCredential userCredential = await _auth.signInWithEmailAndPassword(email: email.trim(), password: password.trim());
+      DocumentSnapshot userDoc = await _firestore
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .get();
+      return userDoc['role']; 
     } catch (e) {
-      print('Nieprawidłowe dane logowania');
+      return e.toString();
     }
-    return null;
   }
   
   Future<void> signOut() async {
@@ -70,20 +75,5 @@ class AuthService {
     } catch (e) {
       print('Coś poszło nie tak');
     }
-  }
-}
-
-FlutterExceptionHandler(String code) {
-  switch(code) {
-    case "invalid-credential":
-      print("Nieprawidłowe dane logowania");
-    case "user-not-found":
-      print("Nie znaleziono użytkownika");
-    case "weak-password":
-      print("Hasło jest zbyt słabe, musi mieć conajmniej 8 znaków");
-    case "email-already-in-use":
-      print("Konto z podanym adresem email już istnieje");
-    default:
-      print("Wystąpił nieznany błąd");
   }
 }
