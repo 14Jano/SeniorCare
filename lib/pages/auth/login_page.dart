@@ -3,6 +3,9 @@ import 'package:senior_care/pages/auth/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:senior_care/pages/auth/forgot_password.dart';
 import 'package:senior_care/pages/auth/signin_page.dart';
+import 'package:senior_care/pages/auth/verification_page.dart';
+import 'package:senior_care/pages/home_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,6 +19,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final _email = TextEditingController();
   final _password = TextEditingController();
+  bool isLoading = false;
+  bool isPasswordHidden = true;
 
   @override
   void dispose() {
@@ -52,6 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 border: const OutlineInputBorder(),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
               ),
+              obscureText: isPasswordHidden,
               controller: _password,
             ),
             
@@ -75,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
               )],
               ),
             ),
-    
+            isLoading ? const Center(child: CircularProgressIndicator(),):
             const SizedBox(height: 30),
             TextButton(
               child: const Text("Zaloguj się"),
@@ -112,7 +118,49 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
   _login() async {
-    await _auth.loginUserWithEmailAndPassword(_email.text, _password.text);
-
+    setState(() {
+      isLoading = true;
+    });
+    String? result = await _auth.loginUserWithEmailAndPassword(
+      email: _email.text, 
+      password: _password.text
+      );
+      setState(() {
+      isLoading = false;
+      });
+      User? user = FirebaseAuth.instance.currentUser;
+      if (user != null && !user.emailVerified) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Proszę zweryfikować swój adres email."),
+          ),
+        );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const VerificationPage()),
+        );
+      }
+      else if (result == "Admin"){
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AdminScreen()
+        ),
+      );
+      }else if (result == "User") {
+        Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (_) => UserScreen()
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              "Logowanie nie powiodło się: $result"),
+          ),
+        );
+      }
   }
 }
