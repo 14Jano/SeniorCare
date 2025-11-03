@@ -23,8 +23,8 @@ class Wrapper extends StatelessWidget{
             if(snapshot.data == null) {
               return const LoginScreen();
             } else {
-              if (snapshot.data?.emailVerified == true){
-                return const LoginScreen();
+              if (snapshot.data!.emailVerified == true){
+                return const HomePage();
               } else{
                 return VerificationPage();
               }

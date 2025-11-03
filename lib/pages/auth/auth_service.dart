@@ -18,7 +18,26 @@ class AuthService {
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      return await _auth.signInWithCredential(credential);
+
+      UserCredential userCredential = await _auth.signInWithCredential(credential);
+      User? user = userCredential.user;
+
+      if (user != null) {
+        final doc = _firestore.collection('users').doc(user.uid);
+        final snapshot = await doc.get();
+
+        if (!snapshot.exists) {
+          await doc.set({
+            'uid': user.uid,
+            'name': user.displayName ?? 'Użytkownik Google',
+            'email': user.email,
+            'role': 'User',
+            'linkedAdminId': null,
+          });
+        }
+      }
+
+      return userCredential;
     } catch (e) {
       print(e.toString());
     }
@@ -45,11 +64,19 @@ class AuthService {
   Future<String?> createUserWithEmailAndPassword({required String name, required String email, required String password, required String role}) async {
     try {
       UserCredential userCredential = await _auth.createUserWithEmailAndPassword(email: email.trim(), password: password.trim());
-      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+
+      Map<String, dynamic> userData = {
+        'uid': userCredential.user!.uid,
         'name': name.trim(),
         'email': email.trim(),
         'role': role,
-      });
+      };
+
+      if (role == "User") {
+        userData['linkedAdminId'] = null;
+      }
+
+      await _firestore.collection('users').doc(userCredential.user!.uid).set(userData);
       return null;
     } catch (e) {
     return e.toString();
