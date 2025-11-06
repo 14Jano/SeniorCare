@@ -69,8 +69,83 @@ int _getScheduleOrder(String schedule) {
     }
   }
 
-  void _showAddMedDialog() {
-    _selectedSchedule = "Rano"; 
+  Future<void> _updateMedication(String medId) async {
+    if (_medNameController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Proszę podać nazwę leku.")),
+      );
+      return;
+    }
+
+    try {
+      int order = _getScheduleOrder(_selectedSchedule);
+
+      await _firestore
+          .collection('users')
+          .doc(widget.userId)
+          .collection('medications')
+          .doc(medId)
+          .update({
+        'name': _medNameController.text,
+        'dosage': _dosageController.text,
+        'scheduleTime': _selectedSchedule,
+        'scheduleOrder': order,
+      });
+
+      Navigator.pop(context);
+      
+    } catch (e) {
+      print("Błąd aktualizacji leku: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Wystąpił błąd podczas aktualizacji leku.")),
+      );
+    }
+  }
+
+  Future<void> _showDeleteConfirmationDialog(String medId) async {
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: Text("Potwierdzenie"),
+          content: Text("Czy na pewno chcesz usunąć ten lek? Tej akcji nie można cofnąć."),
+          actions: [
+            TextButton(
+              child: Text("Anuluj"),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+              },
+            ),
+            TextButton(
+              child: Text("Usuń", style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                _firestore
+                    .collection('users')
+                    .doc(widget.userId)
+                    .collection('medications')
+                    .doc(medId)
+                    .delete();
+
+                Navigator.of(ctx).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showAddMedDialog({DocumentSnapshot? medToEdit}) {
+    final bool isEditing = medToEdit != null;
+    if (isEditing) {
+      _medNameController.text = medToEdit['name'];
+      _dosageController.text = medToEdit['dosage'];
+      _selectedSchedule = medToEdit['scheduleTime'];
+    } else {
+      _medNameController.clear();
+      _dosageController.clear();
+      _selectedSchedule = "Rano";
+    }
     
     showModalBottomSheet(
       context: context,
@@ -129,8 +204,14 @@ int _getScheduleOrder(String schedule) {
                   ),
                   SizedBox(height: 20),
                   ElevatedButton(
-                    onPressed: _addMedication,
-                    child: Text("Dodaj lek"),
+                    onPressed: () {
+                      if (isEditing) {
+                        _updateMedication(medToEdit.id);
+                      } else {
+                        _addMedication();
+                      }
+                    },
+                    child: Text(isEditing ? "Zaktualizuj lek" : "Dodaj lek"),
                     style: ElevatedButton.styleFrom(
                       minimumSize: Size(double.infinity, 50),
                     ),
@@ -199,6 +280,12 @@ int _getScheduleOrder(String schedule) {
                   isTaken ? Icons.check_circle : Icons.radio_button_unchecked,
                   color: isTaken ? Colors.green : Colors.grey,
                 ),
+                onTap: () {
+                  _showAddMedDialog(medToEdit: med);
+                },
+                onLongPress: () {
+                  _showDeleteConfirmationDialog(med.id);
+                },
               );
             },
           );
