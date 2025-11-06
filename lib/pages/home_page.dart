@@ -4,6 +4,7 @@ import 'package:senior_care/pages/auth/login_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:senior_care/pages/user_details_page.dart';
+import 'package:senior_care/pages/notifications_page.dart';
 
 final AuthService _auth = AuthService();
 
@@ -72,6 +73,107 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  @override
+  void initState() {
+    super.initState();
+    if (currentUser != null) {
+      _runMissedMedicationCheck();
+    }
+  }
+  
+Future<void> _runMissedMedicationCheck() async {
+    if (currentUser == null) return;
+    print("Uruchamiam sprawdzanie pominiętych leków...");
+
+    try {
+      DocumentSnapshot adminDoc = await _firestore.collection('users').doc(currentUser!.uid).get();
+      
+      DateTime lastCheckTime;
+      DateTime cutoff = DateTime.now().subtract(Duration(hours: 12)); 
+
+      if ((adminDoc.data() as Map<String, dynamic>).containsKey('lastMissedCheck')) {
+        lastCheckTime = (adminDoc.get('lastMissedCheck') as Timestamp).toDate();
+        if (lastCheckTime.isAfter(cutoff)) {
+          print("Sprawdzano niedawno. Pomijam.");
+          return;
+        }
+      }
+
+      QuerySnapshot linkedUsers = await _firestore
+          .collection('users')
+          .where('linkedAdminId', isEqualTo: currentUser!.uid)
+          .get();
+      
+      if (linkedUsers.docs.isEmpty) {
+        print("Admin nie ma podopiecznych.");
+        return;
+      }
+
+      for (var userDoc in linkedUsers.docs) {
+        String userName = userDoc.get('name');
+        String userId = userDoc.id;
+
+        String scheduleTo_check = _getScheduleTimeForCheck();
+        if (scheduleTo_check == "Brak") continue;
+
+        QuerySnapshot missedMeds = await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('medications')
+            .where('scheduleTime', isEqualTo: scheduleTo_check)
+            .where('isTaken', isEqualTo: false)
+            .get();
+
+        if (missedMeds.docs.isNotEmpty) {
+          print("Użytkownik $userName pominął ${missedMeds.docs.length} leków!");
+          
+          await _createMissedNotification(
+            adminId: currentUser!.uid,
+            userName: userName,
+            schedule: scheduleTo_check,
+            missedCount: missedMeds.docs.length,
+          );
+        }
+      }
+
+      await _firestore.collection('users').doc(currentUser!.uid).update({
+        'lastMissedCheck': FieldValue.serverTimestamp(),
+      });
+
+    } catch (e) {
+      print("Błąd podczas sprawdzania pominiętych leków: $e");
+    }
+  }
+
+  String _getScheduleTimeForCheck() {
+    int hour = DateTime.now().hour;
+    if (hour >= 10 && hour < 14) return "Rano";
+    if (hour >= 15 && hour < 18) return "Południe";
+    if (hour >= 21 && hour < 23) return "Wieczór";
+    
+    return "Brak";
+  }
+
+  Future<void> _createMissedNotification({
+    required String adminId,
+    required String userName,
+    required String schedule,
+    required int missedCount,
+  }) async {
+    await _firestore
+        .collection('users')
+        .doc(adminId)
+        .collection('notifications')
+        .add({
+          'title': "⚠️ $userName pominął leki!",
+          'body': "Wykryto $missedCount pominiętych leków z harmonogramu '$schedule'.",
+          'createdAt': FieldValue.serverTimestamp(),
+          'isRead': false,
+        });
+  }
+
+
+
   void _showInviteDialog() {
     _emailController.clear();
     showDialog(
@@ -107,6 +209,57 @@ class _AdminScreenState extends State<AdminScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Panel Admina"),
+        actions: [
+          StreamBuilder<QuerySnapshot>(
+            stream: _firestore
+                .collection('users')
+                .doc(currentUser!.uid)
+                .collection('notifications')
+                .where('isRead', isEqualTo: false)
+                .snapshots(),
+            builder: (context, snapshot) {
+              int unreadCount = 0;
+              if (snapshot.hasData) {
+                unreadCount = snapshot.data!.docs.length;
+              }
+              return Stack(
+                alignment: Alignment.center,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.notifications),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NotificationsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                  if (unreadCount > 0)
+                    Positioned(
+                      right: 10,
+                      top: 10,
+                      child: Container(
+                        padding: EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$unreadCount',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
       body: LinkedUsersList(adminId: currentUser!.uid),
       floatingActionButton: FloatingActionButton.extended(
@@ -217,6 +370,47 @@ class _UserScreenState extends State<UserScreen> {
     }
   }
 
+  Future<void> _toggleMedStatus(String medId, bool currentStatus, String medName, String medDosage) async {
+    if (currentUser == null) return;
+    try {
+      await _firestore
+          .collection('users')
+          .doc(currentUser!.uid)
+          .collection('medications')
+          .doc(medId)
+          .update({
+            'isTaken': !currentStatus
+          });
+      
+      if (!currentStatus == true) {
+         DocumentSnapshot userDoc = await _firestore.collection('users').doc(currentUser!.uid).get();
+        if (!userDoc.exists || userDoc.get('linkedAdminId') == null) {
+          print("Błąd: User nie ma połączonego admina.");
+          return;
+        }
+        String adminId = userDoc.get('linkedAdminId');
+        String userName = userDoc.get('name');
+
+        await _firestore
+          .collection('users')
+          .doc(adminId)
+          .collection('notifications')
+          .add({
+            'title': "$userName wziął lek",
+            'body': "Potwierdzono wzięcie: $medName ${medDosage ?? ''}",
+            'createdAt': FieldValue.serverTimestamp(),
+            'isRead': false,
+            'userId': currentUser!.uid,
+          });
+      }
+    } catch (e) {
+      print("Błąd zmiany statusu leku: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Błąd: Nie udało się zaktualizować leku.")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (currentUser == null) {
@@ -224,7 +418,7 @@ class _UserScreenState extends State<UserScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text("Mój Panel")),
+      appBar: AppBar(title: Text("Moje leki")),
       body: StreamBuilder<DocumentSnapshot>(
         stream: _firestore.collection('users').doc(currentUser!.uid).snapshots(),
         builder: (context, userSnapshot) {
@@ -238,9 +432,67 @@ class _UserScreenState extends State<UserScreen> {
           var userData = userSnapshot.data!.data() as Map<String, dynamic>;
 
           if (userData['linkedAdminId'] != null) {
-            return Center(
-              child: Text("Jesteś połączony! Tu będzie lista leków."),
+            return StreamBuilder<QuerySnapshot>(
+              stream: _firestore
+                  .collection('users')
+                  .doc(currentUser!.uid)
+                  .collection('medications')
+                  .orderBy('scheduleOrder')
+                  .snapshots(),
+              builder: (context, medSnapshot) {
+                if (medSnapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                }
+                if (medSnapshot.hasError) {
+                  return Center(child: Text("Błąd ładowania leków."));
+                }
+                if (!medSnapshot.hasData || medSnapshot.data!.docs.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Text(
+                        "Opiekun nie dodał jeszcze żadnych leków. Skontaktuj się z nim, aby uzyskać więcej informacji.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+                      ),
+                    ),
+                  );
+                }
+                final medications = medSnapshot.data!.docs;
+                return ListView.builder(
+                  itemCount: medications.length,
+                  itemBuilder: (context, index) {
+                    var med = medications[index];
+                    var medData = med.data() as Map<String, dynamic>;
+                    String medId = med.id;
+                    bool isTaken = medData['isTaken'] ?? false;
+
+                    return CheckboxListTile(
+                      title: Text(
+                        medData['name'] ?? 'Brak nazwy leku',
+                        style: TextStyle(
+                          fontSize: 18,
+                          decoration: isTaken ? TextDecoration.lineThrough : TextDecoration.none,
+                        ),
+                      ),
+                      subtitle: Text("${medData['dosage'] ?? ''} - ${medData['scheduleTime'] ?? ''}"),
+                      value: isTaken,
+                      onChanged: (bool? newValue) {
+                        _toggleMedStatus(
+                          medId, 
+                          isTaken, 
+                          medData['name'] ?? 'Nieznany lek',
+                          medData['dosage'] ?? '',
+                        );
+                      },
+                      controlAffinity: ListTileControlAffinity.leading,
+                      activeColor: Colors.green,
+                    );
+                  },
+                );
+              },
             );
+            
           } else {
             return StreamBuilder<QuerySnapshot>(
               stream: _firestore

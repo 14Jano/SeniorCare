@@ -22,6 +22,19 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
   final TextEditingController _dosageController = TextEditingController();
   String _selectedSchedule = "Rano";
 
+int _getScheduleOrder(String schedule) {
+    switch (schedule) {
+      case "Rano":
+        return 1;
+      case "Południe":
+        return 2;
+      case "Wieczór":
+        return 3;
+      default:
+        return 4;
+    }
+  }
+
   Future<void> _addMedication() async {
     if (_medNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -41,6 +54,7 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
         'scheduleTime': _selectedSchedule,
         'isTaken': false,
         'createdAt': Timestamp.now(),
+        'scheduleOrder': _getScheduleOrder(_selectedSchedule),
       });
 
       Navigator.pop(context);

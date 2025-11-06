@@ -1,1 +1,42 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"seniorcareapp-92e34","appId":"1:250120653507:android:7ab5189b464d4d12027076","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"seniorcareapp-92e34","configurations":{"android":"1:250120653507:android:7ab5189b464d4d12027076","ios":"1:250120653507:ios:d09c12f3caf39a6a027076","web":"1:250120653507:web:45142a2cd7f1b409027076","windows":"1:250120653507:web:75a065b6101d95a4027076"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "seniorcareapp-92e34",
+          "appId": "1:250120653507:android:7ab5189b464d4d12027076",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "seniorcareapp-92e34",
+          "configurations": {
+            "android": "1:250120653507:android:7ab5189b464d4d12027076",
+            "ios": "1:250120653507:ios:d09c12f3caf39a6a027076",
+            "web": "1:250120653507:web:45142a2cd7f1b409027076",
+            "windows": "1:250120653507:web:75a065b6101d95a4027076"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint",
+        "npm --prefix \"$RESOURCE_DIR\" run build"
+      ]
+    }
+  ]
+}
