@@ -244,7 +244,7 @@ int _getScheduleOrder(String schedule) {
             .collection('users')
             .doc(widget.userId)
             .collection('medications')
-            .orderBy('createdAt', descending: true)
+            .orderBy('scheduleOrder')
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -262,32 +262,89 @@ int _getScheduleOrder(String schedule) {
               ),
             );
           }
+          Widget _buildSectionHeader(String title) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 8.0),
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18, 
+                    fontWeight: FontWeight.bold, 
+                    color: Theme.of(context).primaryColor, // Użyj koloru motywu
+                  ),
+                ),
+              );
+            }
+          Widget _buildMedListTile(DocumentSnapshot med) {
+            var medData = med.data() as Map<String, dynamic>;
+            bool isTaken = medData['isTaken'] ?? false;
+
+            return ListTile(
+              title: Text(medData['name'] ?? 'Brak nazwy'),
+              subtitle: Text("${medData['dosage'] ?? ''} - ${medData['scheduleTime'] ?? ''}"),
+              trailing: Icon(
+                isTaken ? Icons.check_circle : Icons.radio_button_unchecked,
+                color: isTaken ? Colors.green : Colors.grey,
+              ),
+              // Funkcje edycji i usuwania, które dodaliśmy wcześniej
+              onLongPress: () {
+                _showDeleteConfirmationDialog(med.id);
+              },
+              onTap: () {
+                _showAddMedDialog(medToEdit: med);
+              },
+            );
+          }
+
+          int _getScheduleOrder(String schedule) {
+          switch (schedule) {
+            case "Rano": return 1;
+            case "Południe": return 2;
+            case "Wieczór": return 3;
+            default: return 4;
+            }
+          }
 
           final medications = snapshot.data!.docs;
 
-          return ListView.builder(
-            itemCount: medications.length,
-            itemBuilder: (context, index) {
-              var med = medications[index];
-              var medData = med.data() as Map<String, dynamic>;
+          final morningMeds = medications
+              .where((doc) => (doc.data() as Map<String, dynamic>)['scheduleTime'] == 'Rano')
+              .toList();
+          final afternoonMeds = medications
+              .where((doc) => (doc.data() as Map<String, dynamic>)['scheduleTime'] == 'Południe')
+              .toList();
+          final eveningMeds = medications
+              .where((doc) => (doc.data() as Map<String, dynamic>)['scheduleTime'] == 'Wieczór')
+              .toList();
+          final otherMeds = medications
+              .where((doc) => !['Rano', 'Południe', 'Wieczór']
+                  .contains((doc.data() as Map<String, dynamic>)['scheduleTime']))
+              .toList();
 
-              bool isTaken = medData['isTaken'] ?? false; 
+          return ListView(
+            children: [
+              // --- SEKCJA RANO ---
+              if (morningMeds.isNotEmpty)
+                _buildSectionHeader('Rano'), // Nasza funkcja pomocnicza
+              ...morningMeds.map((med) => _buildMedListTile(med)).toList(), // Nasza druga funkcja pomocnicza
+
+              // --- SEKCJA POŁUDNIE ---
+              if (afternoonMeds.isNotEmpty)
+                _buildSectionHeader('Południe'),
+              ...afternoonMeds.map((med) => _buildMedListTile(med)).toList(),
               
-              return ListTile(
-                title: Text(medData['name'] ?? 'Brak nazwy'),
-                subtitle: Text("${medData['dosage'] ?? ''} - ${medData['scheduleTime'] ?? ''}"),
-                trailing: Icon(
-                  isTaken ? Icons.check_circle : Icons.radio_button_unchecked,
-                  color: isTaken ? Colors.green : Colors.grey,
-                ),
-                onTap: () {
-                  _showAddMedDialog(medToEdit: med);
-                },
-                onLongPress: () {
-                  _showDeleteConfirmationDialog(med.id);
-                },
-              );
-            },
+              // --- SEKCJA WIECZÓR ---
+              if (eveningMeds.isNotEmpty)
+                _buildSectionHeader('Wieczór'),
+              ...eveningMeds.map((med) => _buildMedListTile(med)).toList(),
+
+              // --- SEKCJA INNE ---
+              if (otherMeds.isNotEmpty)
+                _buildSectionHeader('W razie potrzeby'),
+              ...otherMeds.map((med) => _buildMedListTile(med)).toList(),
+                
+              SizedBox(height: 80), // Dodatkowy padding na dole, aby FAB nie zasłaniał
+            ],
           );
         },
       ),
