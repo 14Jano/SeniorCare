@@ -33,6 +33,7 @@ class AuthService {
             'email': user.email,
             'role': 'User',
             'linkedAdminId': null,
+            'lastResetDate': null,
           });
         }
       }
@@ -74,6 +75,7 @@ class AuthService {
 
       if (role == "User") {
         userData['linkedAdminId'] = null;
+        userData['lastResetDate'] = null;
       }
 
       await _firestore.collection('users').doc(userCredential.user!.uid).set(userData);

@@ -338,6 +338,67 @@ class UserScreen extends StatefulWidget {
 class _UserScreenState extends State<UserScreen> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  bool _isResetting = true;
+
+@override
+  void initState() {
+    super.initState();
+    if (currentUser != null) {
+      _checkAndResetMeds();
+    } else {
+      setState(() {
+        _isResetting = false;
+      });
+    }
+  }
+  Future<void> _checkAndResetMeds() async {
+      try {
+        DocumentReference userDocRef = _firestore.collection('users').doc(currentUser!.uid);
+        DocumentSnapshot userDoc = await userDocRef.get();
+
+        Timestamp? lastReset = (userDoc.data() as Map<String, dynamic>)['lastResetDate'];
+        
+        bool needsReset = false;
+        if (lastReset == null) {
+          needsReset = true;
+        } else {
+          DateTime lastResetDate = lastReset.toDate();
+          DateTime now = DateTime.now();
+          DateTime startOfToday = DateTime(now.year, now.month, now.day); // Dziś o północy
+
+          if (lastResetDate.isBefore(startOfToday)) {
+            needsReset = true;
+          }
+        }
+
+        if (needsReset) {
+          print("Wykryto potrzebę resetu. Resetuję checkboxy...");
+          
+          QuerySnapshot medsSnapshot = await userDocRef.collection('medications').get();
+          
+          WriteBatch batch = _firestore.batch();
+          
+          for (var doc in medsSnapshot.docs) {
+            batch.update(doc.reference, {'isTaken': false});
+          }
+
+          batch.update(userDocRef, {'lastResetDate': Timestamp.now()});
+
+          await batch.commit();
+          print("Reset zakończony.");
+
+        } else {
+          print("Reset na dziś już był. Pomijam.");
+        }
+
+      } catch (e) {
+        print("Błąd podczas resetowania leków: $e");
+      } finally {
+        setState(() {
+          _isResetting = false;
+        });
+      }
+    }  
 
   Future<void> _acceptInvitation(String invitationId, String adminId) async {
     if (currentUser == null) return;
@@ -416,6 +477,12 @@ class _UserScreenState extends State<UserScreen> {
     if (currentUser == null) {
       return Scaffold(body: Center(child: Text("Błąd logowania.")));
     }
+    if (_isResetting) {
+      return Scaffold(
+        appBar: AppBar(title: Text("Moje Leki")),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: Text("Moje leki")),
@@ -459,36 +526,41 @@ class _UserScreenState extends State<UserScreen> {
                   );
                 }
                 final medications = medSnapshot.data!.docs;
-                return ListView.builder(
-                  itemCount: medications.length,
-                  itemBuilder: (context, index) {
-                    var med = medications[index];
-                    var medData = med.data() as Map<String, dynamic>;
-                    String medId = med.id;
-                    bool isTaken = medData['isTaken'] ?? false;
 
-                    return CheckboxListTile(
-                      title: Text(
-                        medData['name'] ?? 'Brak nazwy leku',
-                        style: TextStyle(
-                          fontSize: 18,
-                          decoration: isTaken ? TextDecoration.lineThrough : TextDecoration.none,
-                        ),
-                      ),
-                      subtitle: Text("${medData['dosage'] ?? ''} - ${medData['scheduleTime'] ?? ''}"),
-                      value: isTaken,
-                      onChanged: (bool? newValue) {
-                        _toggleMedStatus(
-                          medId, 
-                          isTaken, 
-                          medData['name'] ?? 'Nieznany lek',
-                          medData['dosage'] ?? '',
-                        );
-                      },
-                      controlAffinity: ListTileControlAffinity.leading,
-                      activeColor: Colors.green,
-                    );
-                  },
+                final morningMeds = medications
+                    .where((doc) => (doc.data() as Map<String, dynamic>)['scheduleTime'] == 'Rano')
+                    .toList();
+                final afternoonMeds = medications
+                    .where((doc) => (doc.data() as Map<String, dynamic>)['scheduleTime'] == 'Południe')
+                    .toList();
+                final eveningMeds = medications
+                    .where((doc) => (doc.data() as Map<String, dynamic>)['scheduleTime'] == 'Wieczór')
+                    .toList();
+                final otherMeds = medications
+                    .where((doc) => !['Rano', 'Południe', 'Wieczór']
+                        .contains((doc.data() as Map<String, dynamic>)['scheduleTime']))
+                    .toList();
+
+
+
+                return ListView(
+                  children: [
+                    if (morningMeds.isNotEmpty)
+                      _buildSectionHeader('Rano'),
+                    ...morningMeds.map((med) => _buildMedCheckboxListTile(med)).toList(),
+
+                    if (afternoonMeds.isNotEmpty)
+                      _buildSectionHeader('Południe'),
+                    ...afternoonMeds.map((med) => _buildMedCheckboxListTile(med)).toList(),
+                    
+                    if (eveningMeds.isNotEmpty)
+                      _buildSectionHeader('Wieczór'),
+                    ...eveningMeds.map((med) => _buildMedCheckboxListTile(med)).toList(),
+
+                    if (otherMeds.isNotEmpty)
+                      _buildSectionHeader('W razie potrzeby'),
+                    ...otherMeds.map((med) => _buildMedCheckboxListTile(med)).toList(),
+                  ],
                 );
               },
             );
@@ -519,6 +591,15 @@ class _UserScreenState extends State<UserScreen> {
                   );
                 }
 
+                if (invSnapshot.hasData && invSnapshot.data!.docs.isNotEmpty) {
+                    var invitation = invSnapshot.data!.docs.first;
+                    return InvitationPending(
+                      adminName: invitation.get('adminName'),
+                      onAccept: () => _acceptInvitation(invitation.id, invitation.get('adminId')),
+                      onDecline: () => _declineInvitation(invitation.id),
+                    );
+                }
+
                 var invitation = invSnapshot.data!.docs.first;
                 String adminName = invitation.get('adminName');
                 String adminId = invitation.get('adminId');
@@ -534,6 +615,45 @@ class _UserScreenState extends State<UserScreen> {
           }
         },
       ),
+    );
+  }
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 8.0),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 18, 
+          fontWeight: FontWeight.bold, 
+          color: Theme.of(context).primaryColorDark,
+        ),
+      ),
+    );
+  }
+
+Widget _buildMedCheckboxListTile(DocumentSnapshot med) {
+    var medData = med.data() as Map<String, dynamic>;
+    String medId = med.id;
+    bool isTaken = medData['isTaken'] ?? false;
+    String medName = medData['name'] ?? 'Brak nazwy';
+    String medDosage = medData['dosage'] ?? '';
+
+    return CheckboxListTile(
+      title: Text(
+        medName,
+        style: TextStyle(
+          fontSize: 18,
+          decoration: isTaken ? TextDecoration.lineThrough : TextDecoration.none,
+          color: isTaken ? Colors.grey[600] : Colors.black,
+        ),
+      ),
+      subtitle: Text("${medDosage} - ${medData['scheduleTime'] ?? ''}"),
+      value: isTaken,
+      onChanged: (bool? newValue) {
+        _toggleMedStatus(medId, isTaken, medName, medDosage);
+      },
+      controlAffinity: ListTileControlAffinity.leading,
+      activeColor: Colors.green,
     );
   }
 }
