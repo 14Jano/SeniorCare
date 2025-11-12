@@ -83,18 +83,16 @@ class _AdminScreenState extends State<AdminScreen> {
   
 Future<void> _runMissedMedicationCheck() async {
     if (currentUser == null) return;
-    print("Uruchamiam sprawdzanie pominiętych leków...");
+    print("Uruchamiam SPRAWDZANIE RETROAKTYWNE pominiętych leków...");
 
     try {
       DocumentSnapshot adminDoc = await _firestore.collection('users').doc(currentUser!.uid).get();
-      
-      DateTime lastCheckTime;
-      DateTime cutoff = DateTime.now().subtract(Duration(hours: 12)); 
+      DateTime cutoff = DateTime.now().subtract(Duration(hours: 3));
 
       if ((adminDoc.data() as Map<String, dynamic>).containsKey('lastMissedCheck')) {
-        lastCheckTime = (adminDoc.get('lastMissedCheck') as Timestamp).toDate();
+        DateTime lastCheckTime = (adminDoc.get('lastMissedCheck') as Timestamp).toDate();
         if (lastCheckTime.isAfter(cutoff)) {
-          print("Sprawdzano niedawno. Pomijam.");
+          print("Sprawdzano niedawno (mniej niż 3h temu). Pomijam.");
           return;
         }
       }
@@ -104,35 +102,61 @@ Future<void> _runMissedMedicationCheck() async {
           .where('linkedAdminId', isEqualTo: currentUser!.uid)
           .get();
       
-      if (linkedUsers.docs.isEmpty) {
-        print("Admin nie ma podopiecznych.");
+      if (linkedUsers.docs.isEmpty) return;
+
+      int hour = DateTime.now().hour;
+      List<String> schedulesToCheck = [];
+      
+      if (hour >= 10) schedulesToCheck.add("Rano");
+      if (hour >= 15) schedulesToCheck.add("Południe");
+      if (hour >= 21) schedulesToCheck.add("Wieczór");
+
+      if (schedulesToCheck.isEmpty) {
+        print("Za wcześnie na sprawdzanie jakichkolwiek harmonogramów.");
         return;
       }
+      print("Sprawdzam zaległości dla: $schedulesToCheck");
 
       for (var userDoc in linkedUsers.docs) {
         String userName = userDoc.get('name');
         String userId = userDoc.id;
 
-        String scheduleTo_check = _getScheduleTimeForCheck();
-        if (scheduleTo_check == "Brak") continue;
-
-        QuerySnapshot missedMeds = await _firestore
-            .collection('users')
-            .doc(userId)
-            .collection('medications')
-            .where('scheduleTime', isEqualTo: scheduleTo_check)
-            .where('isTaken', isEqualTo: false)
-            .get();
-
-        if (missedMeds.docs.isNotEmpty) {
-          print("Użytkownik $userName pominął ${missedMeds.docs.length} leków!");
+        for (String schedule in schedulesToCheck) {
           
-          await _createMissedNotification(
-            adminId: currentUser!.uid,
-            userName: userName,
-            schedule: scheduleTo_check,
-            missedCount: missedMeds.docs.length,
-          );
+          DateTime startOfToday = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+          
+          QuerySnapshot existingAlerts = await _firestore
+              .collection('users')
+              .doc(currentUser!.uid)
+              .collection('notifications')
+              .where('userId', isEqualTo: userId)
+              .where('schedule', isEqualTo: schedule)
+              .where('createdAt', isGreaterThanOrEqualTo: startOfToday)
+              .get();
+
+          if (existingAlerts.docs.isEmpty) {
+            
+            QuerySnapshot missedMeds = await _firestore
+                .collection('users')
+                .doc(userId)
+                .collection('medications')
+                .where('scheduleTime', isEqualTo: schedule)
+                .where('isTaken', isEqualTo: false)
+                .get();
+
+            if (missedMeds.docs.isNotEmpty) {
+              print("Użytkownik $userName pominął $schedule! Wysyłam alert.");
+              await _createMissedNotification(
+                adminId: currentUser!.uid,
+                userName: userName,
+                schedule: schedule,
+                missedCount: missedMeds.docs.length,
+                userId: userId,
+              );
+            }
+          } else {
+            print("Alert dla $userName ($schedule) został już wysłany dzisiaj. Pomijam.");
+          }
         }
       }
 
@@ -145,20 +169,12 @@ Future<void> _runMissedMedicationCheck() async {
     }
   }
 
-  String _getScheduleTimeForCheck() {
-    int hour = DateTime.now().hour;
-    if (hour >= 10 && hour < 14) return "Rano";
-    if (hour >= 15 && hour < 18) return "Południe";
-    if (hour >= 21 && hour < 23) return "Wieczór";
-    
-    return "Brak";
-  }
-
   Future<void> _createMissedNotification({
     required String adminId,
     required String userName,
     required String schedule,
     required int missedCount,
+    required String userId,
   }) async {
     await _firestore
         .collection('users')
@@ -169,6 +185,8 @@ Future<void> _runMissedMedicationCheck() async {
           'body': "Wykryto $missedCount pominiętych leków z harmonogramu '$schedule'.",
           'createdAt': FieldValue.serverTimestamp(),
           'isRead': false,
+          'schedule': schedule,
+          'userId': userId,
         });
   }
 
@@ -278,6 +296,43 @@ class LinkedUsersList extends StatelessWidget {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  Future<void> _showUnlinkConfirmationDialog(BuildContext context, String userId, String userName) async {
+    showDialog(
+      context: context,
+      builder: (BuildContext ctx) {
+        return AlertDialog(
+          title: Text("Potwierdzenie"),
+          content: Text("Czy na pewno chcesz usunąć podopiecznego: $userName?"),
+          actions: [
+            TextButton(
+              child: Text("Anuluj"),
+              onPressed: () {
+                Navigator.of(ctx).pop();
+              },
+            ),
+            TextButton(
+              child: Text("Usuń", style: TextStyle(color: Colors.red)),
+              onPressed: () async {
+                try {
+                  await _firestore
+                      .collection('users')
+                      .doc(userId)
+                      .update({'linkedAdminId': null});
+                  Navigator.of(ctx).pop();
+                } catch (e) {
+                  Navigator.of(ctx).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Wystąpił błąd: $e")),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<QuerySnapshot>(
@@ -321,6 +376,9 @@ class LinkedUsersList extends StatelessWidget {
                     ),
                   ),
                 );
+              },
+              onLongPress: () {
+                _showUnlinkConfirmationDialog(context, userId, userData['name'] ?? 'Brak nazwy');
               },
             );
           },
