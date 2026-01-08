@@ -226,55 +226,75 @@ Future<void> _runMissedMedicationCheck() async {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Panel Admina"),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Panel Opiekuna"),
+            if (currentUser != null)
+              Text(
+                FirebaseAuth.instance.currentUser?.email ?? '',
+                style: const TextStyle(fontSize: 16),
+              ),
+          ],
+        ),
         actions: [
-          StreamBuilder<QuerySnapshot>(
-            stream: _firestore
-                .collection('users')
-                .doc(currentUser!.uid)
-                .collection('notifications')
-                .where('isRead', isEqualTo: false)
-                .snapshots(),
-            builder: (context, snapshot) {
-              int unreadCount = 0;
-              if (snapshot.hasData) {
-                unreadCount = snapshot.data!.docs.length;
-              }
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.notifications),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => NotificationsPage(),
-                        ),
-                      );
-                    },
-                  ),
-                  if (unreadCount > 0)
-                    Positioned(
-                      right: 10,
-                      top: 10,
-                      child: Container(
-                        padding: EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.red,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '$unreadCount',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 8,
-                          ),
+        // 🔔 POWIADOMIENIA
+        StreamBuilder<QuerySnapshot>(
+          stream: _firestore
+              .collection('users')
+              .doc(currentUser!.uid)
+              .collection('notifications')
+              .where('isRead', isEqualTo: false)
+              .snapshots(),
+          builder: (context, snapshot) {
+            int unreadCount = 0;
+            if (snapshot.hasData) {
+              unreadCount = snapshot.data!.docs.length;
+            }
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NotificationsPage(),
+                      ),
+                    );
+                  },
+                ),
+                if (unreadCount > 0)
+                  Positioned(
+                    right: 10,
+                    top: 10,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '$unreadCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
                         ),
                       ),
                     ),
-                ],
-              );
+                  ),
+              ],
+            );
+          },
+        ),
+
+          // 🚪 WYLOGOWANIE
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Wyloguj się",
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
             },
           ),
         ],

@@ -73,31 +73,34 @@ class _SignInPageState extends State<SignInPage> {
               height: 50,
             ),
             TextField(
+              style: const TextStyle(fontSize: 20),
               decoration: InputDecoration(
                 hintText: "Wprowadź imię",
                 labelText: "Imię",
                 border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               ),
               controller: _name,
             ),
             const SizedBox(height: 20),
             TextField(
+              style: const TextStyle(fontSize: 20),
               decoration: InputDecoration(
                 hintText: "Wprowadź email",
                 labelText: "Email",
                 border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               ),
               controller: _email,
             ),
             const SizedBox(height: 20),
             TextField(
+              style: const TextStyle(fontSize: 20),
               decoration: InputDecoration(
                 hintText: "Wprowadź hasło",
                 labelText: "Hasło",
                 border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                 suffixIcon: IconButton(
                   onPressed: (){
                     setState(() {
@@ -132,6 +135,10 @@ class _SignInPageState extends State<SignInPage> {
             _isLoading ? const Center(child: CircularProgressIndicator(),):
             const SizedBox(height: 30),
             ElevatedButton(
+              style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 60),
+              textStyle: const TextStyle(fontSize: 20),
+              ),
               onPressed: _signup,
               child: const Text("Zarejestruj się"),
             ),
