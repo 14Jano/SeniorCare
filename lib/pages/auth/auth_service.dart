@@ -1,50 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
-
-  Future<UserCredential?> signInWithGoogle() async {
-    try {
-      final googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return null;
-      
-      final googleAuth = await googleUser.authentication;
-
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      UserCredential userCredential = await _auth.signInWithCredential(credential);
-      User? user = userCredential.user;
-
-      if (user != null) {
-        final doc = _firestore.collection('users').doc(user.uid);
-        final snapshot = await doc.get();
-
-        if (!snapshot.exists) {
-          await doc.set({
-            'uid': user.uid,
-            'name': user.displayName ?? 'Użytkownik Google',
-            'email': user.email,
-            'role': 'User',
-            'linkedAdminId': null,
-            'lastResetDate': null,
-          });
-        }
-      }
-
-      return userCredential;
-    } catch (e) {
-      print(e.toString());
-    }
-    return null;
-  }
-
 
   Future<void> sendEmailVerification() async {
     try {

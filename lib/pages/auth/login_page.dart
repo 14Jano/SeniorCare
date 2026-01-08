@@ -41,21 +41,23 @@ class _LoginScreenState extends State<LoginScreen> {
                 style: TextStyle(fontSize: 40, fontWeight: FontWeight.w500)),
             const SizedBox(height: 50),
             TextField(
+              style: const TextStyle(fontSize: 20),
               decoration: InputDecoration(
                 hintText: "Wprowadź email",
                 labelText: "Email",
                 border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               ),
               controller: _email,
             ),
             const SizedBox(height: 20),
             TextField(
+              style: const TextStyle(fontSize: 20),
               decoration: InputDecoration(
                 hintText: "Wprowadź hasło",
                 labelText: "Hasło",
                 border: const OutlineInputBorder(),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
               ),
               obscureText: isPasswordHidden,
               controller: _password,
@@ -84,17 +86,12 @@ class _LoginScreenState extends State<LoginScreen> {
             isLoading ? const Center(child: CircularProgressIndicator(),):
             const SizedBox(height: 30),
             TextButton(
-              child: const Text("Zaloguj się"),
+              style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 60),
+              textStyle: const TextStyle(fontSize: 20),
+              ),
               onPressed: _login,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SquareTile(
-                  imagePath: 'assets/google.png',
-                  onTap: () => AuthService().signInWithGoogle(),
-                ),
-              ],
+              child: const Text("Zaloguj się"),
             ),
             const SizedBox(height: 5),
             Row(mainAxisAlignment: MainAxisAlignment.center, children: [
