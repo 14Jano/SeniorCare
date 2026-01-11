@@ -563,7 +563,28 @@ class _UserScreenState extends State<UserScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: Text("Moje leki")),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("Moje Leki"),
+            if (currentUser != null)
+              Text(
+                FirebaseAuth.instance.currentUser?.email ?? '',
+                style: const TextStyle(fontSize: 16),
+              ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Wyloguj się",
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+            },
+          ),
+        ],
+      ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: _firestore.collection('users').doc(currentUser!.uid).snapshots(),
         builder: (context, userSnapshot) {
@@ -793,39 +814,6 @@ class InvitationPending extends StatelessWidget {
   }
 }
 
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.green,
-      appBar: AppBar(
-        title: const Text("User Panel"),
-        backgroundColor: Colors.green,
-        foregroundColor: Colors.white,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text("Witaj w panelu użytkownika!"),
-            ElevatedButton(
-              onPressed: () {
-                _auth.signOut();
-                print("Wylogowano pomyślnie.");
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const LoginScreen(),
-                  ),
-                );
-              },
-              child: const Text("Wyloguj się"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
