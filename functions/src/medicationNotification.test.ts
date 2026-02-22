@@ -53,3 +53,42 @@ test("builds expected FCM payload", () => {
     },
   });
 });
+
+test("should not send notification when already taken", () => {
+  const result = shouldSendMedicationNotification(
+    {isTaken: true, name: "Aspiryna"},
+    {isTaken: true, name: "Aspiryna"},
+  );
+
+  assert.equal(result, false);
+});
+
+test("should not send notification when medication is unchecked", () => {
+  const result = shouldSendMedicationNotification(
+    {isTaken: true, name: "Aspiryna"},
+    {isTaken: false, name: "Aspiryna"},
+  );
+
+  assert.equal(result, false);
+});
+
+test("should not send notification when next state is missing", () => {
+  const result = shouldSendMedicationNotification(
+    {isTaken: false, name: "Aspiryna"},
+    undefined,
+  );
+
+  assert.equal(result, false);
+});
+
+test("payload keeps exact identifiers", () => {
+  const payload = buildMedicationNotificationPayload(
+    "Anna",
+    "Witamina D",
+    "user-special-42",
+    "med-special-99",
+  );
+
+  assert.equal(payload.data.userId, "user-special-42");
+  assert.equal(payload.data.medId, "med-special-99");
+});
