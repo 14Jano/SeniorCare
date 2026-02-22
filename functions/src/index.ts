@@ -11,6 +11,10 @@ import {setGlobalOptions} from "firebase-functions";
 import * as logger from "firebase-functions/logger";
 import {onDocumentUpdated} from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
+import {
+  buildMedicationNotificationPayload,
+  shouldSendMedicationNotification,
+} from "./medicationNotification";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -26,7 +30,7 @@ export const onMedicationTaken = onDocumentUpdated(
     const dataAfter = event.data.after.data();
     const {userId, medId} = event.params;
 
-    if (dataBefore?.isTaken === false && dataAfter?.isTaken === true) {
+    if (shouldSendMedicationNotification(dataBefore, dataAfter)) {
       logger.log(`Lek ${dataAfter.name} wzięty przez ${userId}`);
       const userDoc = await db.collection("users").doc(userId).get();
       if (!userDoc.exists) {
@@ -57,20 +61,12 @@ export const onMedicationTaken = onDocumentUpdated(
         return;
       }
       const fcmToken = adminData.fcmToken;
-      const body = `${userData.name} właśnie potwierdził wzięcie` +
-        ` leku: ${dataAfter.name}.`;
-      const payload = {
-        notification: {
-          title: "Podopieczny wziął lek! ✅",
-          body: body,
-          sound: "default",
-        },
-        data: {
-          "click_action": "FLUTTER_NOTIFICATION_CLICK",
-          "userId": userId,
-          "medId": medId,
-        },
-      };
+      const payload = buildMedicationNotificationPayload(
+        userData.name,
+        dataAfter.name,
+        userId,
+        medId,
+      );
 
       try {
         await admin.messaging().sendToDevice(fcmToken, payload);
