@@ -80,4 +80,4 @@ _Wkrótce._
 
 **Jan Łabaj** – [@14Jano](https://github.com/14Jano) · [LinkedIn](https://www.linkedin.com/in/janlabaj)
 
-Praca inżynierska, [nazwa uczelni], [rok].
+Praca inżynierska, Collegium Witelona Uczelnia Państwowa, 2026.
